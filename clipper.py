@@ -1,16 +1,23 @@
-import sys, re, os, time, subprocess
+import sys, re, os, time, subprocess, errno
 from pipes import quote
 from datetime import datetime #both datetime imports needed?
 from datetime import timedelta #both datetime imports needed?
 
-
+# from http://stackoverflow.com/questions/273192
+def make_sure_path_exists(path):
+    try:
+        os.makedirs(path)
+    except OSError as exception:
+        if exception.errno != errno.EEXIST:
+            raise
 
 class clipper:
     """Generates the actually ffmpeg clipping"""
     def __init__(self, annos, outPath, inFile, audio, videoFilters, videoCodec):
         tstart = float(annos[0])/1000. # convert milliseconds to seconds
         tend = float(annos[1])/1000. # convert milliseconds to seconds
-        outFile = quote(outPath.replace( " ", r"" )+".mp4") # strips spaces, there has to be a better way than this.
+        make_sure_path_exists(os.path.dirname(outPath))
+        outFile = outPath+'.mp4' # This works with spaces again, but why did I use quote() before?
 
         # allow non logging
         #logfile = quote(''.join([flag,outName,"-",name,"-clip",str(n),".log"]))
@@ -25,13 +32,20 @@ class clipper:
         #deinterlace+crop '-vf "[in] yadif=1 [o1]; [o1] crop=1464:825:324:251 [out]"'
         #deinterlace '-vf "[in] yadif=1 [out]"'
         dur = tend-tstart
-        cmd = ['../Resources/ffmpeg']
+        cmd = ['../Resources/ffmpeg'] # for including in package
         cmd = ['ffmpeg']
+
+        opts = ['-i', infile]
+
+        if videoFilters != '':
+            opts.extend(['-vf', videoFilters])
+            
+        opts.extend(['-ss', str(tstart), '-t', str(dur),'-sameq']) 
+               
         if audio == False:
-            aud = '-an'
-        else:
-            aud = ''
-        opts = ['-i', infile, '-vf', videoFilters, '-ss', str(tstart), '-t', str(dur),'-sameq', aud, '-vcodec', videoCodec, '-y', outfile]
+             opts.extend(['-an'])
+            
+        opts.extend(['-vcodec', videoCodec, '-y', outfile])
         cmd.extend(opts)
         if verbose: print(cmd)
         if log: logFile = open(log, 'w')
