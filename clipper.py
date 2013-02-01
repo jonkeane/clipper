@@ -13,20 +13,19 @@ def make_sure_path_exists(path):
 
 class clipper:
     """Generates the actually ffmpeg clipping"""
-    def __init__(self, annos, outPath, inFile, audio, videoFilters, videoCodec):
+    def __init__(self, annos, outPath, inFile, audio, videoFilters, videoCodec, videoQuality, otherOptions):
         tstart = float(annos[0])/1000. # convert milliseconds to seconds
         tend = float(annos[1])/1000. # convert milliseconds to seconds
         make_sure_path_exists(os.path.dirname(outPath))
         outFile = outPath+'.mp4' # This works with spaces again, but why did I use quote() before?
 
-        # allow non logging
-        #logfile = quote(''.join([flag,outName,"-",name,"-clip",str(n),".log"]))
-        #infile = quote(path)
+        # allow logging doesn't work currently
+        logfile = quote(''.join([outPath,".log"]))
 
-        proc = self.clipFunc(infile=inFile, outfile=outFile, tstart=tstart, tend=tend, audio=audio, videoFilters=videoFilters, videoCodec=videoCodec,  log=None, verbose=True)
+        proc = self.clipFunc(infile=inFile, outfile=outFile, tstart=tstart, tend=tend, audio=audio, videoFilters=videoFilters, videoCodec=videoCodec, videoQuality=videoQuality, otherOptions=otherOptions, log=None, verbose=True)
         self.subProc = proc
     
-    def clipFunc(self, infile, outfile, tstart, tend, audio='', videoFilters='', videoCodec='mpeg4', log=None, verbose=False):
+    def clipFunc(self, infile, outfile, tstart, tend, audio='', videoFilters='', videoCodec='', videoQuality='', otherOptions= [], log=None, verbose=False):
         ''' clips video with no options '''
         #deinterlace+crop+scale '-vf "[in] yadif=1 [o1]; [o1] crop=1464:825:324:251 [o2]; [o2] scale=852:480 [out]"'
         #deinterlace+crop '-vf "[in] yadif=1 [o1]; [o1] crop=1464:825:324:251 [out]"'
@@ -35,20 +34,37 @@ class clipper:
         cmd = ['../Resources/ffmpeg'] # for including in package
         cmd = ['ffmpeg']
 
-        opts = ['-i', infile]
+        opts = []
+
+        ## # specify a prejump to seek to a little while before the clipping should begin. doesn't work for some clips?
+        ## preJump = tstart-30
+        ## if preJump > 0:
+        ##    opts.extend(['-ss', str(timedelta(seconds=preJump))])
+
+        opts.extend(['-i', infile])
 
         if videoFilters != '':
             opts.extend(['-vf', videoFilters])
             
-        opts.extend(['-ss', str(tstart), '-t', str(dur),'-sameq']) 
+        opts.extend(['-ss', str(timedelta(seconds=tstart)), '-t', str(timedelta(seconds=dur))])
+
+        if videoQuality != '':
+            opts.extend(['-qscale', videoQuality])
                
         if audio == False:
              opts.extend(['-an'])
-            
-        opts.extend(['-vcodec', videoCodec, '-y', outfile])
+
+        if videoCodec != '':
+            opts.extend(['-vcodec', videoCodec])
+
+        if otherOptions != ['']:
+            opts.extend(otherOptions)
+
+        opts.extend(['-y', outfile])
         cmd.extend(opts)
         if verbose: print(cmd)
-        if log: logFile = open(log, 'w')
+        # logging currently doesn't work?
+        if log: logFile = open(log, 'w') 
         p = subprocess.Popen(cmd, stderr=subprocess.STDOUT, stdout = subprocess.PIPE, bufsize=1, universal_newlines=True)
         return p
 
